@@ -143,7 +143,7 @@ class ShapeClassifier(BaseClassifier):
         elif shape == "Square":
             rotated_rect = cv2.minAreaRect(contour)
             box = cv2.boxPoints(rotated_rect)
-            box = np.int0(box)
+            box = np.int32(box)
             cv2.drawContours(processed_frame, [box], 0, (0, 255, 0), 2)
         elif shape == "Circle":
             (x, y), radius = cv2.minEnclosingCircle(approx)
