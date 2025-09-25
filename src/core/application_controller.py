@@ -56,7 +56,7 @@ class ApplicationController:
         start_time_read = time.time()
         while not self.stop_event.is_set():
             data = self.serial_manager.read_data()
-            if data:
+            if data is not None:
                 rpm_value, obstacle_sensor_state_value = data
                 current_time = time.time() - start_time_read
                 self.data_deque.append((current_time, rpm_value, obstacle_sensor_state_value))
