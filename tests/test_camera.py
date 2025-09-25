@@ -1,5 +1,6 @@
 import unittest
 import cv2
+import numpy as np
 from unittest.mock import patch, MagicMock
 from src.hardware.camera import Camera
 from src.config.config import AppConfig
