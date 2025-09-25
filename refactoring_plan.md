@@ -132,8 +132,8 @@ Since the Gemini CLI context resets, it's important to have a clear strategy for
         *   Manages the main application loop, data flow, and state.
         *   Handles obstacle detection logic and servo code determination.
         *   Should not directly interact with the GUI.
-3.  **User Interface Layer (Replace PySimpleGUI with pyimgui):**
-    *   **Choose a New GUI Framework:** We will proceed with `pyimgui` given its suitability for embedded vision systems and real-time display needs.
+3.  **User Interface Layer (Replace PySimpleGUI with PyQt6):**
+    *   **Choose a New GUI Framework:** We will proceed with `PyQt6` given its robustness, feature set, and suitability for desktop applications with complex UI and integration needs.
     *   **`GUI` Class (or equivalent):**
         *   Responsible solely for displaying information and capturing user input.
         *   Should observe changes in the `ApplicationController` (Observer Pattern) to update its display.
