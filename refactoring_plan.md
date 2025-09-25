@@ -47,40 +47,33 @@ A layered architecture is recommended:
 4.  **User Interface Layer:** Handles all GUI interactions and displays, decoupled from the core logic.
 5.  **Configuration Layer:** Manages all application settings and parameters.
 
-## Task Plan
+## Task Plan (Checklist)
 
 ### Phase 1: Setup and Configuration
 
-1.  **Version Control Setup:**
-    *   Initialize a Git repository in the project root.
-    *   Create a corresponding GitHub repository and link it.
-    *   **Commit Strategy:** After each task that results in a functional, tested change, commit the changes. Commit messages should be clear, concise, and follow conventional guidelines (e.g., `feat: Add new feature`, `fix: Resolve bug`, `refactor: Improve code structure`).
+- [x] **Version Control Setup:**
+    - [x] Initialize a Git repository in the project root.
+    - [ ] Create a corresponding GitHub repository and link it. (This is an external step, not managed by the agent)
+    - [x] **Commit Strategy:** After each task that results in a functional, tested change, commit the changes. Commit messages should be clear, concise, and follow conventional guidelines (e.g., `feat: Add new feature`, `fix: Resolve bug`, `refactor: Improve code structure`).
 
-2.  **Environment Setup (Manjaro Linux):**
-    *   Create a Python virtual environment (`.venv`) to manage project dependencies in isolation. This is crucial for avoiding conflicts with system-wide packages.
-        ```bash
-        python -m venv .venv
-        source .venv/bin/activate
-        ```
-    *   Install necessary dependencies (e.g., `opencv-python`, `pyserial`, `numpy`, `matplotlib`, `PyQt5` or chosen GUI framework) into the virtual environment.
-        ```bash
-        pip install -r requirements.txt
-        ```
+- [x] **Environment Setup (Manjaro Linux):**
+    - [x] Create a Python virtual environment (`.venv`) to manage project dependencies in isolation.
+    - [x] Install necessary dependencies (e.g., `opencv-python`, `pyserial`, `numpy`, `matplotlib`, `PyQt5` or chosen GUI framework) into the virtual environment.
 
-3.  **Project Structure:**
-    *   `src/`: For core application logic.
-    *   `src/config/`: For configuration files.
-    *   `src/hardware/`: For HAL components.
-    *   `src/vision/`: For vision processing modules.
-    *   `src/gui/`: For GUI-related code.
-    *   `src/core/`: For business logic and main application flow.
-    *   `tests/`: For unit and integration tests.
-    *   `requirements.txt`: To manage dependencies.
-    *   `README.md`: Project documentation.
+- [x] **Project Structure:**
+    - [x] `src/`: For core application logic.
+    - [x] `src/config/`: For configuration files.
+    - [x] `src/hardware/`: For HAL components.
+    - [x] `src/vision/`: For vision processing modules.
+    - [x] `src/gui/`: For GUI-related code.
+    - [x] `src/core/`: For business logic and main application flow.
+    - [x] `tests/`: For unit and integration tests.
+    - [x] `requirements.txt`: To manage dependencies.
+    - [ ] `README.md`: Project documentation. (Needs to be updated)
 
-4.  **Configuration Management:**
-    *   Extract all hardcoded constants (thresholds, camera settings, serial settings) into a `config.py` file or use a more robust configuration library (e.g., `configparser`, `PyYAML`).
-    *   Implement a `Config` class to load and manage these settings.
+- [x] **Configuration Management:**
+    - [x] Extract all hardcoded constants (thresholds, camera settings, serial settings) into a `config.py` file or use a more robust configuration library (e.g., `configparser`, `PyYAML`).
+    - [x] Implement a `Config` class to load and manage these settings.
 
 ## Recommendations for Continuing Work (Gemini CLI Context Reset)
 
@@ -94,67 +87,74 @@ Since the Gemini CLI context resets, it's important to have a clear strategy for
 *   **Review `refactoring_plan.md`:** Re-read this plan to recall the overall goals and the next steps.
 *   **Activate Virtual Environment:** Always remember to activate your virtual environment (`source .venv/bin/activate`) before running any Python commands.
 
+*   **Current Debugging Context (Serial Port & Fonts):**
+    *   **Serial Port Issue:** The `ttyS` identifier was removed from `SERIAL_DEVICE_IDENTIFIERS` in `src/config/config.py` to prevent connection attempts to generic system serial ports.
+    *   **Permission Denied Fix:** User was instructed to add themselves to the `uucp` group (`sudo usermod -a -G uucp $USER`) and to log out/in for changes to take effect.
+    *   **Font Warnings:** User was advised to install `ttf-ms-fonts` via `yay` on Manjaro to resolve `findfont` warnings.
+    *   **Serial Port Connection Verified:** The serial port connection issue has been resolved and verified.
+
 
 
 ### Phase 2: Refactor `cvband.py` (Vision Processing Layer)
 
-1.  **Introduce Classes for Vision Components:**
-    *   **`ImageProcessor` Class:**
-        *   Encapsulate common image processing steps (e.g., `color_detector`, `shape_detector`, `size_detector`, `calibrate_camera`).
-        *   Methods should take an image frame and return processed data (e.g., detected objects, classifications) without directly modifying the frame or handling display.
-        *   Parameters like thresholds and camera calibration values should be passed during initialization or as method arguments, not hardcoded.
-    *   **`ObjectClassifier` Class (Strategy Pattern):**
-        *   Define an interface for classifiers (e.g., `ColorClassifier`, `ShapeClassifier`, `SizeClassifier`).
-        *   Each classifier class will implement a `classify(frame)` method.
-        *   The `ImageProcessor` can use an instance of `ObjectClassifier` to perform classification.
-    *   **`Camera` Class:**
-        *   Abstract camera initialization and frame capturing.
-        *   Handle `cv2.VideoCapture` instance.
-2.  **Improve Modularity and Reusability:**
-    *   Break down complex functions into smaller, single-responsibility methods.
-    *   Eliminate redundant code by creating helper methods or classes.
-    *   Replace magic strings for servo codes with `Enum` types (e.g., `ClassificationType`, `ServoCode`).
-3.  **Error Handling:**
-    *   Implement robust error handling for image processing operations (e.g., `try-except` blocks for OpenCV functions).
+- [x] **Introduce Classes for Vision Components:**
+    - [x] **`ImageProcessor` Class:**
+        - [x] Encapsulate common image processing steps (e.g., `color_detector`, `shape_detector`, `size_detector`, `calibrate_camera`).
+        - [x] Methods should take an image frame and return processed data (e.g., detected objects, classifications) without directly modifying the frame or handling display.
+        - [x] Parameters like thresholds and camera calibration values should be passed during initialization or as method arguments, not hardcoded.
+    - [x] **`ObjectClassifier` Class (Strategy Pattern):**
+        - [x] Define an interface for classifiers (e.g., `ColorClassifier`, `ShapeClassifier`, `SizeClassifier`).
+        - [x] Each classifier class will implement a `classify(frame)` method.
+    - [x] **`Camera` Class:**
+        - [x] Abstract camera initialization and frame capturing.
+        - [x] Handle `cv2.VideoCapture` instance.
+- [x] **Improve Modularity and Reusability:**
+    - [x] Break down complex functions into smaller, single-responsibility methods.
+    - [x] Eliminate redundant code by creating helper methods or classes.
+    - [x] Replace magic strings for servo codes with `Enum` types (e.g., `ClassificationType`, `ServoCode`).
+- [x] **Error Handling:**
+    - [x] Implement robust error handling for image processing operations (e.g., `try-except` blocks for OpenCV functions).
 
 ### Phase 3: Refactor `main.py` (Hardware Abstraction, Business Logic, and GUI)
 
-1.  **Hardware Abstraction Layer (HAL):**
-    *   **`SerialManager` Class:**
-        *   Handle serial port communication (Arduino).
-        *   Methods for connecting, reading data, and writing commands (e.g., `send_command(pwm, servo_code)`).
-        *   Manage `get_arduino_port` logic.
-        *   Implement proper error handling for serial communication.
-2.  **Business Logic Layer:**
-    *   **`ApplicationController` Class:**
-        *   Orchestrate the entire application flow.
-        *   Connects the `Camera`, `ImageProcessor`, `ObjectClassifier`, and `SerialManager`.
-        *   Manages the main application loop, data flow, and state.
-        *   Handles obstacle detection logic and servo code determination.
-        *   Should not directly interact with the GUI.
-3.  **User Interface Layer (Replace PySimpleGUI with PyQt6):**
-    *   **Choose a New GUI Framework:** We will proceed with `PyQt6` given its robustness, feature set, and suitability for desktop applications with complex UI and integration needs.
-    *   **`GUI` Class (or equivalent):**
-        *   Responsible solely for displaying information and capturing user input.
-        *   Should observe changes in the `ApplicationController` (Observer Pattern) to update its display.
-        *   Should trigger actions in the `ApplicationController` based on user input (e.g., button clicks, slider changes).
-        *   Decouple UI elements from application logic.
-    *   **Data Visualization:**
-        *   Integrate `matplotlib` for plotting RPM data within the new GUI framework.
-        *   Ensure graph updates are handled efficiently without blocking the UI.
-4.  **Threading Model:**
-    *   Review and potentially refine the threading strategy to ensure UI responsiveness and efficient background processing.
-    *   Consider using a producer-consumer pattern for data exchange between threads.
+- [x] **Hardware Abstraction Layer (HAL):**
+    - [x] **`SerialManager` Class:**
+        - [x] Handle serial port communication (Arduino).
+        - [x] Methods for connecting, reading data, and writing commands (e.g., `send_command(pwm, servo_code)`).
+        - [x] Manage `get_arduino_port` logic.
+        - [x] Implement proper error handling for serial communication.
+
+- [x] **Business Logic Layer:**
+    - [x] **`ApplicationController` Class:**
+        - [x] Orchestrate the entire application flow.
+        - [x] Connects the `Camera`, `ImageProcessor`, `ObjectClassifier`, and `SerialManager`.
+        - [x] Manages the main application loop, data flow, and state.
+        - [x] Handles obstacle detection logic and servo code determination.
+        - [x] Should not directly interact with the GUI.
+- [x] **User Interface Layer (Replace PySimpleGUI with PyQt6):**
+    - [x] **Choose a New GUI Framework:** We will proceed with `PyQt6` given its robustness, feature set, and suitability for desktop applications with complex UI and integration needs.
+    - [x] **`GUI` Class (or equivalent):**
+        - [x] Responsible solely for displaying information and capturing user input.
+        - [x] Should observe changes in the `ApplicationController` (Observer Pattern) to update its display.
+        - [x] Should trigger actions in the `ApplicationController` based on user input (e.g., button clicks, slider changes).
+        - [x] Decouple UI elements from application logic.
+    - [x] **Data Visualization:**
+        - [x] Integrate `matplotlib` for plotting RPM data within the new GUI framework.
+        - [x] Ensure graph updates are handled efficiently without blocking the UI.
+
+- [x] **Threading Model:**
+    - [x] Review and potentially refine the threading strategy to ensure UI responsiveness and efficient background processing.
+    - [x] Consider using a producer-consumer pattern for data exchange between threads.
 
 ### Phase 4: Testing and Deployment
 
-1.  **Unit Tests:**
-    *   Write unit tests for each class and module (e.g., `ImageProcessor`, `SerialManager`, `ObjectClassifier`).
-2.  **Integration Tests:**
-    *   Test the interaction between different layers and components.
-3.  **Documentation:**
-    *   Update `README.md` with new architecture, setup instructions, and usage.
-    *   Add docstrings to all classes and functions.
+- [ ] **Unit Tests:**
+    - [ ] Write unit tests for each class and module (e.g., `ImageProcessor`, `SerialManager`, `ObjectClassifier`). (Pending due to issues)
+- [ ] **Integration Tests:**
+    - [ ] Test the interaction between different layers and components.
+- [ ] **Documentation:**
+    - [ ] Update `README.md` with new architecture, setup instructions, and usage.
+    - [ ] Add docstrings to all classes and functions.
 
 ## Example of Class Structure (Conceptual)
 
@@ -201,6 +201,7 @@ class ServoCode(Enum):
     SMALL = '0'
     MEDIUM = '1'
     LARGE = '2'
+    UNKNOWN = '9' # Default for unclassified or error
 
 class BaseClassifier:
     def classify(self, frame) -> (ServoCode, processed_frame):
@@ -311,4 +312,3 @@ if __name__ == "__main__":
     # controller.start() # This would be a blocking call, needs to be handled carefully with GUI
 
     app.exec_() # For PyQt
-```

@@ -2,7 +2,7 @@ import cv2
 
 class AppConfig:
     # Camera Settings
-    WEBCAM_INDEX = 1
+    WEBCAM_INDEX = 0
     CAMERA_RESOLUTION = (600, 600) # Renamed from CAMERA_ZISE for clarity
 
     # Vision Processing Thresholds
@@ -16,6 +16,18 @@ class AppConfig:
 
     # Serial Communication Settings
     BAUDRATE = 9600
+    # List of known serial device identifiers (substrings to search in description or hwid)
+    # Add common identifiers for Arduino, ESP32, Raspberry Pi, etc.
+    SERIAL_DEVICE_IDENTIFIERS = [
+        "VID:PID=2341:0043",  # Arduino Uno
+        "Arduino",
+        "VID:PID=10C4:EA60",  # CP210x (common for ESP32)
+        "VID:PID=1A86:7523",  # CH340 (common for ESP32)
+        "USB-SERIAL CH340",
+        "ESP32",
+        "ttyACM",             # Generic ACM device (often Arduinos)
+        "ttyUSB"             # Generic USB serial (often various microcontrollers)
+    ]
 
     # Application Logic Timings
     DETECTION_PROCESSING_TIME_SECONDS = 2 # Consolidated from DETECTION_DELAY and PROCESSING_TIME

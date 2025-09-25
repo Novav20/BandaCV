@@ -21,6 +21,11 @@ class BaseClassifier:
     def __init__(self, config: AppConfig):
         self.config = config
 
+    def _draw_text(self, frame: np.ndarray, text: str, position: tuple, color: tuple = (255, 255, 255)):
+        """Helper method to draw text on the frame using configured font settings."""
+        cv2.putText(frame, text, position, self.config.OPENCV_FONT,
+                    self.config.OPENCV_FONT_SCALE, color, self.config.OPENCV_FONT_THICKNESS, cv2.LINE_AA)
+
     def classify(self, frame: np.ndarray) -> (ServoCode, np.ndarray):
         """Abstract method to classify an object in a frame.
         Returns a ServoCode and the processed frame with annotations.
@@ -88,7 +93,7 @@ class ColorClassifier(BaseClassifier):
         if max_c is not None:
             x,y,w,h = cv2.boundingRect(max_c)
             cv2.rectangle(processed_frame,(x,y),(x+w,y+h),color_code,2)
-        cv2.putText(processed_frame, color, (processed_frame.shape[1]-100,50), self.config.OPENCV_FONT, self.config.OPENCV_FONT_SCALE, color_code, self.config.OPENCV_FONT_THICKNESS, cv2.LINE_AA)
+        self._draw_text(processed_frame, color, (processed_frame.shape[1]-100,50), color_code)
 
         return servo_code, processed_frame
 
@@ -155,7 +160,7 @@ class ShapeClassifier(BaseClassifier):
         if M["m00"] != 0:
             cX = int(M["m10"] / M["m00"])
             cY = int(M["m01"] / M["m00"])
-            cv2.putText(processed_frame, shape, (cX, cY), self.config.OPENCV_FONT, self.config.OPENCV_FONT_SCALE, (255, 255, 255), self.config.OPENCV_FONT_THICKNESS)
+            self._draw_text(processed_frame, shape, (cX, cY), (255, 255, 255))
 
         return servo_code, processed_frame
 
@@ -201,7 +206,7 @@ class SizeClassifier(BaseClassifier):
     def classify(self, frame: np.ndarray) -> (ServoCode, np.ndarray):
         processed_frame = frame.copy()
         if self.pixels_per_cm is None:
-            cv2.putText(processed_frame, "Calibrate first!", (50, 50), self.config.OPENCV_FONT, 1, (0, 0, 255), 2, cv2.LINE_AA)
+            self._draw_text(processed_frame, "Calibrate first!", (50, 50), (0, 0, 255))
             return ServoCode.UNKNOWN, processed_frame
 
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -273,6 +278,6 @@ class SizeClassifier(BaseClassifier):
                         size_text = f"Small: {width:.1f} cm x {height:.1f} cm"
                         servo_code = ServoCode.SMALL
 
-                cv2.putText(processed_frame, size_text, (cX - 20, cY - 20), self.config.OPENCV_FONT, self.config.OPENCV_FONT_SCALE, (255, 255, 255), self.config.OPENCV_FONT_THICKNESS)
+                self._draw_text(processed_frame, size_text, (cX - 20, cY - 20), (255, 255, 255))
 
         return servo_code, processed_frame

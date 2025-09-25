@@ -6,7 +6,7 @@ from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_qt6agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 
 from src.core.application_controller import ApplicationController
 from src.config.config import AppConfig
@@ -117,7 +117,7 @@ class MainWindow(QMainWindow):
 
         self.size_checkbox = QCheckBox("Size")
         self.size_checkbox.toggled.connect(lambda checked: self.on_classifier_checkbox_toggled("size", checked))
-        left_column_column.addWidget(self.size_checkbox)
+        left_column_layout.addWidget(self.size_checkbox)
 
         # Action Buttons
         button_layout = QHBoxLayout()

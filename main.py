@@ -1,3 +1,6 @@
+import matplotlib
+matplotlib.use('QtAgg') # Explicitly set the backend
+
 import sys
 from PyQt6.QtWidgets import QApplication
 from src.config.config import AppConfig
