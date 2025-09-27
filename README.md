@@ -71,6 +71,25 @@ To run the application, execute the `main.py` script:
 python main.py
 ```
 
+### Controls
+
+*   **PWM Slider/Text:** Controls the speed of the conveyor belt motor.
+*   **Classifier Checkboxes:** Select the desired classification mode.
+    *   **Color:** Classifies objects based on their color (red, yellow, or green).
+    *   **Shape:** Classifies objects based on their shape (triangle, square, or circle).
+    *   **Size:** Classifies objects based on their size (small, medium, or large). Requires calibration.
+*   **Calibrate Camera:** Starts the calibration process for the size classifier.
+*   **Stop:** Stops the application and closes the window.
+
+### Calibration
+
+To use the size classifier, you must first calibrate the camera:
+
+1.  Place a circular object with a known diameter (e.g., a coin) in the camera's field of view.
+2.  Click the **Calibrate Camera** button.
+3.  The application will attempt to detect the object and calculate the pixels-per-centimeter ratio.
+4.  The result of the calibration will be displayed in the status bar and next to the obstacle sensor state.
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a pull request.
