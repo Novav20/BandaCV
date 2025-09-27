@@ -4,6 +4,7 @@ import numpy as np
 from src.config.config import AppConfig
 
 class ServoCode(Enum):
+    """Enum for representing the servo codes to be sent to the Arduino."""
     # These codes are examples and should be mapped to actual servo actions
     # based on the hardware setup.
     TRIANGLE = '0'
@@ -18,21 +19,43 @@ class ServoCode(Enum):
     UNKNOWN = '9' # Default for unclassified or error
 
 class BaseClassifier:
+    """Base class for all classifiers.
+
+    Args:
+        config (AppConfig): The application configuration object.
+    """
     def __init__(self, config: AppConfig):
         self.config = config
 
     def _draw_text(self, frame: np.ndarray, text: str, position: tuple, color: tuple = (255, 255, 255)):
-        """Helper method to draw text on the frame using configured font settings."""
+        """Draws text on a frame.
+
+        Args:
+            frame (np.ndarray): The frame to draw on.
+            text (str): The text to draw.
+            position (tuple): The position of the text.
+            color (tuple, optional): The color of the text. Defaults to (255, 255, 255).
+        """
         cv2.putText(frame, text, position, self.config.OPENCV_FONT,
                     self.config.OPENCV_FONT_SCALE, color, self.config.OPENCV_FONT_THICKNESS, cv2.LINE_AA)
 
-    def classify(self, frame: np.ndarray) -> (ServoCode, np.ndarray):
-        """Abstract method to classify an object in a frame.
-        Returns a ServoCode and the processed frame with annotations.
+    def classify(self, frame: np.ndarray) -> tuple[ServoCode, np.ndarray]:
+        """Abstract method for classifying an object in a frame.
+
+        Args:
+            frame (np.ndarray): The input frame.
+
+        Raises:
+            NotImplementedError: This method must be implemented by subclasses.
+
+        Returns:
+            tuple[ServoCode, np.ndarray]: A tuple containing the servo code and the
+                                           processed frame with annotations.
         """
         raise NotImplementedError
 
 class ColorClassifier(BaseClassifier):
+    """Classifier for detecting objects based on their color."""
     def __init__(self, config: AppConfig):
         super().__init__(config)
         self.red_lower = np.array(self.config.RED_LOWER_HSV)
@@ -43,7 +66,16 @@ class ColorClassifier(BaseClassifier):
         self.green_upper = np.array(self.config.GREEN_UPPER_HSV)
         self.kernel = np.ones((self.config.MORPHOLOGY_KERNEL_SIZE, self.config.MORPHOLOGY_KERNEL_SIZE), np.uint8)
 
-    def classify(self, frame: np.ndarray) -> (ServoCode, np.ndarray):
+    def classify(self, frame: np.ndarray) -> tuple[ServoCode, np.ndarray]:
+        """Classifies an object based on its color.
+
+        Args:
+            frame (np.ndarray): The input frame.
+
+        Returns:
+            tuple[ServoCode, np.ndarray]: A tuple containing the servo code and the
+                                           processed frame with annotations.
+        """
         processed_frame = frame.copy()
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
@@ -98,10 +130,20 @@ class ColorClassifier(BaseClassifier):
         return servo_code, processed_frame
 
 class ShapeClassifier(BaseClassifier):
+    """Classifier for detecting objects based on their shape."""
     def __init__(self, config: AppConfig):
         super().__init__(config)
 
-    def classify(self, frame: np.ndarray) -> (ServoCode, np.ndarray):
+    def classify(self, frame: np.ndarray) -> tuple[ServoCode, np.ndarray]:
+        """Classifies an object based on its shape.
+
+        Args:
+            frame (np.ndarray): The input frame.
+
+        Returns:
+            tuple[ServoCode, np.ndarray]: A tuple containing the servo code and the
+                                           processed frame with annotations.
+        """
         processed_frame = frame.copy()
         # This classifier needs a mask, typically from a color detection step.
         # For now, we'll assume a pre-processed mask or integrate a simple thresholding.
@@ -165,11 +207,21 @@ class ShapeClassifier(BaseClassifier):
         return servo_code, processed_frame
 
 class SizeClassifier(BaseClassifier):
+    """Classifier for detecting objects based on their size."""
     def __init__(self, config: AppConfig):
         super().__init__(config)
         self.pixels_per_cm = None
 
     def calibrate(self, frame: np.ndarray, known_diameter_cm: float) -> float:
+        """Calibrates the size classifier using an object of a known size.
+
+        Args:
+            frame (np.ndarray): The input frame containing the calibration object.
+            known_diameter_cm (float): The known diameter of the calibration object in cm.
+
+        Returns:
+            float: The calculated pixels-per-centimeter ratio, or None if calibration fails.
+        """
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         blurred = cv2.GaussianBlur(gray, (5, 5), 0)
         edged = cv2.Canny(blurred, 50, 100)
@@ -203,7 +255,16 @@ class SizeClassifier(BaseClassifier):
                         return self.pixels_per_cm
         return None
 
-    def classify(self, frame: np.ndarray) -> (ServoCode, np.ndarray):
+    def classify(self, frame: np.ndarray) -> tuple[ServoCode, np.ndarray]:
+        """Classifies an object based on its size.
+
+        Args:
+            frame (np.ndarray): The input frame.
+
+        Returns:
+            tuple[ServoCode, np.ndarray]: A tuple containing the servo code and the
+                                           processed frame with annotations.
+        """
         processed_frame = frame.copy()
         if self.pixels_per_cm is None:
             self._draw_text(processed_frame, "Calibrate first!", (50, 50), (0, 0, 255))

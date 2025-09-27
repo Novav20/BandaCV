@@ -1,6 +1,12 @@
 import cv2
 
 class AppConfig:
+    """Configuration class for the BandaCV application.
+
+    This class centralizes all the configuration parameters for the application,
+    including camera settings, vision processing thresholds, serial communication
+    settings, and other constants.
+    """
     # Camera Settings
     WEBCAM_INDEX = 0
     CAMERA_RESOLUTION = (600, 600) # Renamed from CAMERA_ZISE for clarity

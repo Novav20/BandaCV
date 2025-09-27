@@ -12,6 +12,16 @@ from src.core.application_controller import ApplicationController
 from src.config.config import AppConfig
 
 class MainWindow(QMainWindow):
+    """The main window of the BandaCV application.
+
+    This class is responsible for creating and managing the graphical user
+    interface (GUI) using PyQt6. It displays the webcam feed, control widgets,
+    and data visualizations. It communicates with the ApplicationController to
+    send user commands and receive updates.
+
+    Args:
+        controller (ApplicationController): The main application controller.
+    """
     # Define custom signals for updating UI from other threads
     frame_update_signal = pyqtSignal(np.ndarray)
     graph_update_signal = pyqtSignal(list, list)
@@ -47,6 +57,7 @@ class MainWindow(QMainWindow):
         self.controller.start()
 
     def setup_ui(self):
+        """Initializes and arranges all the UI widgets in the main window."""
         # Left Column: Controls and Graph
         left_column_layout = QVBoxLayout()
 
@@ -148,6 +159,7 @@ class MainWindow(QMainWindow):
         self.main_layout.addLayout(right_column_layout)
 
     def setup_graph(self):
+        """Configures the appearance of the Matplotlib graph for RPM data."""
         self.ax.set_facecolor('#1A2835')
         self.ax.tick_params(colors='white')
         self.ax.xaxis.label.set_color('white')
@@ -166,6 +178,7 @@ class MainWindow(QMainWindow):
         self.figure.tight_layout()
 
     def connect_signals(self):
+        """Connects the UI signals to their respective slots."""
         self.frame_update_signal.connect(self.update_webcam_feed)
         self.graph_update_signal.connect(self.update_graph)
         self.led_update_signal.connect(self.update_led)
@@ -173,6 +186,11 @@ class MainWindow(QMainWindow):
         self.status_message_signal.connect(self.status_bar.showMessage)
 
     def update_webcam_feed(self, frame: np.ndarray):
+        """Updates the webcam feed label with a new frame.
+
+        Args:
+            frame (np.ndarray): The new video frame to display.
+        """
         if frame is None:
             return
         h, w, ch = frame.shape
@@ -182,6 +200,12 @@ class MainWindow(QMainWindow):
         self.webcam_label.setPixmap(QPixmap.fromImage(p))
 
     def update_graph(self, time_values: list, rpm_values: list):
+        """Updates the RPM graph with new data.
+
+        Args:
+            time_values (list): A list of timestamps.
+            rpm_values (list): A list of RPM values.
+        """
         window_size = 5
         if len(rpm_values) >= window_size:
             smoothed_rpm_values = np.convolve(rpm_values, np.ones(window_size)/window_size, mode='valid')
@@ -191,19 +215,35 @@ class MainWindow(QMainWindow):
             self.canvas.draw()
 
     def update_led(self, state: int):
+        """Updates the obstacle sensor LED indicator.
+
+        Args:
+            state (int): The state of the obstacle sensor (1 for detected, 0 for not).
+        """
         if state == 1:
             self.led_label.setStyleSheet("background-color: red; border-radius: 20px;")
         else:
             self.led_label.setStyleSheet("background-color: gray; border-radius: 20px;")
 
     def update_calibration_label(self, pixels_per_cm: float):
+        """Updates the calibration label with the new pixels-per-centimeter value.
+
+        Args:
+            pixels_per_cm (float): The new calibration value.
+        """
         self.calibration_label.setText(f"px/cm: {pixels_per_cm:.2f}")
 
     def update_pwm_from_slider(self, value: int):
+        """Updates the PWM value from the slider.
+
+        Args:
+            value (int): The new PWM value from the slider.
+        """
         self.pwm_text.setText(str(value))
         self.controller.set_pwm(value)
 
     def update_pwm_from_text(self):
+        """Updates the PWM value from the text input field."""
         try:
             value = int(self.pwm_text.text())
             if 0 <= value <= 255:
@@ -215,6 +255,14 @@ class MainWindow(QMainWindow):
             self.status_bar.showMessage("Invalid PWM value. Please enter a number.")
 
     def on_classifier_checkbox_toggled(self, classifier_key: str, checked: bool):
+        """Handles the toggling of classifier checkboxes.
+
+        This method ensures that only one classifier can be active at a time.
+
+        Args:
+            classifier_key (str): The key of the classifier that was toggled.
+            checked (bool): The new state of the checkbox.
+        """
         if checked:
             # Deactivate other checkboxes
             if classifier_key != "color":
@@ -233,5 +281,12 @@ class MainWindow(QMainWindow):
                 self.controller.set_active_classifier(None) # Deactivate all
 
     def closeEvent(self, event):
+        """Handles the window close event.
+
+        This method stops the application controller before closing the window.
+
+        Args:
+            event: The close event.
+        """
         self.controller.stop()
         event.accept()

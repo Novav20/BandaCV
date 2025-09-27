@@ -5,13 +5,25 @@ from src.config.config import AppConfig
 from src.vision.classifiers import ServoCode
 
 class SerialManager:
+    """Manages the serial communication with the Arduino.
+
+    This class handles finding the correct serial port, connecting to the device,
+    reading data, and sending commands.
+
+    Args:
+        baudrate (int): The baud rate for the serial communication.
+    """
     def __init__(self, baudrate=AppConfig.BAUDRATE):
         self.baudrate = baudrate
         self.ser = None
         self.connected = False
 
-    def _find_serial_device_port(self):
-        """Finds a suitable serial port based on configured identifiers."""
+    def _find_serial_device_port(self) -> str | None:
+        """Finds a suitable serial port based on configured identifiers.
+
+        Returns:
+            str | None: The device port string if found, otherwise None.
+        """
         ports = list(serial.tools.list_ports.comports())
         for port in ports:
             for identifier in AppConfig.SERIAL_DEVICE_IDENTIFIERS:
@@ -19,8 +31,15 @@ class SerialManager:
                     return str(port.device)
         return None
 
-    def connect(self):
-        """Connects to the serial device port."""
+    def connect(self) -> bool:
+        """Connects to the serial device.
+
+        This method searches for the serial device and establishes a connection.
+        It will keep retrying until a device is found.
+
+        Returns:
+            bool: True if the connection is successful, False otherwise.
+        """
         if self.connected and self.ser.is_open:
             print("Already connected to serial device.")
             return True
@@ -52,7 +71,15 @@ class SerialManager:
             print("Disconnected from serial device.")
 
     def read_data(self) -> tuple[int, int] | None:
-        """Reads data from the serial port (RPM_OBSTACLE_STATE)."""
+        """Reads and parses data from the serial port.
+
+        The expected format is "RPM_OBSTACLE_STATE".
+
+        Returns:
+            tuple[int, int] | None: A tuple containing the RPM value and the
+                                     obstacle sensor state, or None if an error
+                                     occurs.
+        """
         if not self.connected or not self.ser.is_open:
             return None
         try:
@@ -69,7 +96,14 @@ class SerialManager:
         return None
 
     def send_command(self, pwm_value: int, servo_code: ServoCode):
-        """Sends a command to the serial device (PWM_SERVOCODE)."""
+        """Sends a command to the Arduino.
+
+        The command format is "PWM_SERVOCODE".
+
+        Args:
+            pwm_value (int): The PWM value for the motor.
+            servo_code (ServoCode): The code for the servo position.
+        """
         if not self.connected or not self.ser.is_open:
             print("Not connected to serial device. Command not sent.")
             return
