@@ -93,7 +93,79 @@ Since the Gemini CLI context resets, it's important to have a clear strategy for
     *   **Font Warnings:** User was advised to install `ttf-ms-fonts` via `yay` on Manjaro to resolve `findfont` warnings.
     *   **Serial Port Connection Verified:** The serial port connection issue has been resolved and verified.
 
+## Debugging Session: DC Motor and Serial Communication (2025-09-29)
 
+### Problem Statement:
+The Pololu 37D DC motor with encoder, controlled via an L298N driver, was behaving like a binary switch (only full speed at PWM 255) despite UI input ranging from 0-255. Initial hardware checks (ENA to 5V/3.3V) showed no change, but touching the ENA pin modulated speed, suggesting a floating input or connection issue.
+
+### Debugging Steps and Findings:
+
+1.  **Initial Code Review (Arduino & Python):**
+    *   `Motor.cpp`: `analogWrite()` and `setSpeed()` logic appeared correct.
+    *   `Communication.cpp`: Initial parsing logic using `String.toInt()` was identified as a potential weak point.
+    *   `serial_manager.py`: Python side seemed to correctly construct and send `PWM_SERVOCODE` commands.
+    *   `connections.md`: Wiring diagram was verified and deemed correct.
+
+2.  **Isolated Arduino Test Sketch:**
+    *   A simple Arduino sketch was created to directly cycle PWM values (0-255) using `analogWrite()` without any serial communication.
+    *   **Result:** The motor *successfully* accelerated and decelerated smoothly.
+    *   **Conclusion:** This definitively proved that the hardware (Arduino's PWM pins, L298N driver, motor, power supply, and basic wiring) is capable of variable speed control. The problem was confirmed to be in the software, specifically the serial communication/parsing.
+
+3.  **Attempted Software Fixes (Arduino `Communication.cpp`):
+    *   **Fix 1: Robust Parsing:** Modified `Communication.cpp` to use `atoi()` (more reliable C-style string to int conversion) and `trim()` to handle potential `\r` characters. Changed separator from `_` to `,` in both Python and Arduino.
+    *   **Result:** Motor behavior remained unchanged (binary switch). Debug messages from Arduino (e.g., "Comando Recibido: [XXX") showed that the Arduino was only receiving the PWM value, not the full command string with the separator and servo code.
+    *   **Conclusion:** The problem was not in *how* the Arduino parsed the string, but that it was *not receiving the full string* in the first place.
+
+4.  **Attempted Software Fixes (Python `serial_manager.py`):
+    *   **Fix 2: Add Delay:** Added `time.sleep(0.05)` after `serial.write()` in Python to give Arduino more time to process.
+    *   **Result:** No change. Arduino still only received partial commands.
+    *   **Fix 3: Python Debug Prints:** Added `print(f"Sent from Python: {command.decode().strip()}")` to confirm Python was sending the full command.
+    *   **Result:** Python confirmed it was sending the full command (e.g., `Sent from Python: 127,9`). However, Arduino debug messages were still not appearing in the Python terminal.
+
+5.  **Isolation Test (Python sending, Arduino monitoring):
+    *   **Setup:** Modified Python (`application_controller.py` and `serial_manager.py`) to prevent it from reading from the serial port, allowing `arduino-cli monitor` to have exclusive read access. Arduino was loaded with granular debug prints (`Recibido char: [X]`).
+    *   **Result:** Python reported `Not connected to serial device. Command not sent.` because the `connect()` call was blocked by `arduino-cli monitor`. Crucially, **no "Recibido char:" messages appeared in the `arduino-cli monitor` terminal.**
+    *   **Conclusion:** This definitively confirmed that **no serial data is physically reaching the Arduino's serial port from the computer.** The problem is at the physical layer of the serial communication.
+
+### Current Status & Next Steps:
+
+*   **Problem:** Physical serial communication breakdown between computer and Arduino. Python sends data, but Arduino does not receive it.
+*   **Recommendation:** Focus on hardware troubleshooting:
+    1.  **Try a different USB cable.**
+    2.  **Try a different USB port** on the computer.
+    3.  **Try a different computer** (if available) to rule out system-specific issues.
+    4.  Inspect Arduino's USB port and serial chip for damage.
+*   **Code State:**
+    *   Python files (`application_controller.py`, `serial_manager.py`) have been reverted to their original state.
+    *   Arduino file (`arduino_code/Communication.cpp`) still contains the granular debug prints. This will be reverted to its original state now.
+
+## Debugging Session: Motor PWM and Timer Conflict (2025-09-30)
+
+### Problem Statement
+After fixing the serial communication parsing, the motor continued to exhibit "binary" behavior (only working at PWM 255). This occurred even though `atoi()` was correctly parsing the incoming integer values.
+
+### Debugging Steps and Findings
+
+1.  **Visual Debugging with LED:** Since the serial monitor was occupied by the Python application, a hardware debugging approach was used. An LED was connected to Arduino Pin 11. The Arduino code was modified to write the parsed `pwmValue` to this LED using `analogWrite()`.
+2.  **Observation:** The brightness of the LED on Pin 11 correctly and smoothly corresponded to the PWM value sent from the Python UI (i.e., it got brighter as the slider was moved from 0 to 255).
+    *   **Conclusion:** This definitively proved that the Python code, serial transmission, and Arduino command parsing were all working correctly. The `pwmValue` variable was being populated with the correct intermediate values.
+3.  **Pin Swap Test:** The user connected the motor's ENA to Pin 11 and the debug LED to Pin 9.
+    *   **Result:** The motor, now on Pin 11, worked perfectly with variable speed. The LED, now on Pin 9, exhibited the original problem: it only turned on at 255.
+    *   **Conclusion:** This isolated the fault to **Arduino Pin 9**, which was not outputting a PWM signal as expected within the context of the full application.
+
+### Root Cause Analysis
+
+The contradictory behavior (Pin 9 working in an isolated test but not in the full application) was traced to a **hardware timer conflict**.
+*   The Arduino `Servo` library, used for the classifier servo on Pin 10, uses the hardware **Timer1**.
+*   On the Arduino Uno, Timer1 is also responsible for PWM functionality on **Pins 9 and 10**.
+*   When the `Servo` library is initialized, it takes exclusive control of Timer1, disabling PWM on Pin 9.
+
+### Resolution
+
+1.  **Permanent Pin Change:** The motor's PWM control pin was permanently moved from Pin 9 to **Pin 11**, which uses a different hardware timer that does not conflict with the Servo library.
+2.  **Code Update:** The `CONVEYOR_MOTOR_PWM_PIN` constant in `arduino_code.ino` was updated to `11`.
+3.  **Documentation Update:** `connections.md` was updated to reflect the new wiring.
+4.  **Code Cleanup:** All debugging code (the LED logic in `Communication.h` a.k.a. `cpp` and debug prints/delays in `serial_manager.py`) was removed. The serial protocol was reverted to use `_` as a separator for consistency.
 
 ### Phase 2: Refactor `cvband.py` (Vision Processing Layer)
 
@@ -146,15 +218,30 @@ Since the Gemini CLI context resets, it's important to have a clear strategy for
     - [x] Review and potentially refine the threading strategy to ensure UI responsiveness and efficient background processing.
     - [x] Consider using a producer-consumer pattern for data exchange between threads.
 
-### Phase 4: Testing and Deployment
+### Phase 4: Hardware Integration (Step-by-Step)
+
+- [ ] **Infrared (IR) Sensor Interaction:**
+    - [x] Verify existing implementation for IR sensor reading and UI LED update.
+    - [ ] Connect IR sensor to Arduino (`OBSTACLE_SENSOR_PIN`).
+    - [ ] Upload Arduino code.
+    - [ ] Run Python application and test interaction.
+- [ ] **Servomotor Integration:**
+    - [ ] Connect servomotor to Arduino (`SERVO_PIN`).
+    - [ ] Test servomotor control from Python application (e.g., by selecting different classifiers).
+- [ ] **DC Motor with Encoder Integration:**
+    - [ ] Connect DC motor and encoder to Arduino (`MOTOR_PWM_PIN`, `MOTOR_DIR_PIN`, `RPM_SENSOR_PIN`).
+    - [ ] Test motor speed control from Python application (PWM slider).
+    - [ ] Test RPM reading and graph update in UI.
+
+### Phase 5: Testing and Deployment (Moved to End)
 
 - [ ] **Unit Tests:**
-    - [ ] Write unit tests for each class and module (e.g., `ImageProcessor`, `SerialManager`, `ObjectClassifier`). (Pending due to issues)
+    - [ ] Write unit tests for each class and module (e.g., `ImageProcessor`, `SerialManager`, `ObjectClassifier`).
 - [ ] **Integration Tests:**
     - [ ] Test the interaction between different layers and components.
 - [ ] **Documentation:**
-    - [ ] Update `README.md` with new architecture, setup instructions, and usage.
-    - [ ] Add docstrings to all classes and functions.
+    - [x] Update `README.md` with new architecture, setup instructions, and usage.
+    - [x] Add docstrings to all classes and functions.
 
 ## Example of Class Structure (Conceptual)
 
@@ -191,7 +278,7 @@ class SerialManager:
 # src/vision/classifiers.py
 from enum import Enum
 
-class ServoCode(Enum):
+class ServoCode:
     TRIANGLE = '0'
     SQUARE = '1'
     CIRCLE = '2'

@@ -31,6 +31,7 @@ void Communication::handleSerial() {
 }
 
 void Communication::processCommand(String command) {
+    command.trim();
     int separatorIndex = command.indexOf('_');
     if (separatorIndex == -1) {
         return; // Invalid command format

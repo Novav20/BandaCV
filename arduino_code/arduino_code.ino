@@ -5,32 +5,31 @@
 #include "Communication.h"
 
 // --- Pin Definitions ---
-const int MOTOR_PWM_PIN = 9;
-const int MOTOR_DIR_PIN = 8;
-const int SERVO_PIN = 10;
-const int OBSTACLE_SENSOR_PIN = 7;
-const int RPM_SENSOR_PIN = 2;
+const int CONVEYOR_MOTOR_PWM_PIN = 11;   // PWM pin for conveyor motor speed (moved from 9 due to timer conflict)
+const int CLASSIFIER_SERVO_PIN = 10;     // PWM pin for the classification servo
+const int OBSTACLE_IR_SENSOR_PIN = 7;    // Digital pin for the infrared obstacle sensor
+const int CONVEYOR_ENCODER_PIN = 2;      // Interrupt pin for the conveyor's RPM encoder
 
 // --- Constants ---
-const long BAUD_RATE = 9600;
-const int PULSES_PER_REVOLUTION = 20;
+const long SERIAL_BAUD_RATE = 9600;
+const int ENCODER_PULSES_PER_REVOLUTION = 20;
 
 // --- Component Objects ---
-Motor motor(MOTOR_PWM_PIN, MOTOR_DIR_PIN);
-ClassifierServo classifierServo(SERVO_PIN);
-RpmSensor rpmSensor(RPM_SENSOR_PIN, PULSES_PER_REVOLUTION);
-ObstacleSensor obstacleSensor(OBSTACLE_SENSOR_PIN);
-Communication communication(BAUD_RATE, &motor, &classifierServo);
+Motor conveyorMotor(CONVEYOR_MOTOR_PWM_PIN);
+ClassifierServo classifierServo(CLASSIFIER_SERVO_PIN);
+RpmSensor rpmSensor(CONVEYOR_ENCODER_PIN, ENCODER_PULSES_PER_REVOLUTION);
+ObstacleSensor obstacleSensor(OBSTACLE_IR_SENSOR_PIN);
+Communication serialCommunicator(SERIAL_BAUD_RATE, &conveyorMotor, &classifierServo);
 
 void setup() {
-    motor.setup();
+    conveyorMotor.setup();
     classifierServo.setup();
     rpmSensor.setup();
     obstacleSensor.setup();
-    communication.setup();
+    serialCommunicator.setup();
 }
 
 void loop() {
     rpmSensor.update();
-    communication.update(rpmSensor.getRpm(), obstacleSensor.getState());
+    serialCommunicator.update(rpmSensor.getRpm(), obstacleSensor.getState());
 }

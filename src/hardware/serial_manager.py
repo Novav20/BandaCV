@@ -105,11 +105,10 @@ class SerialManager:
             servo_code (ServoCode): The code for the servo position.
         """
         if not self.connected or not self.ser.is_open:
-            print("Not connected to serial device. Command not sent.")
+            # Silently return if not connected, to avoid flooding the console
             return
         try:
             command = f"{pwm_value}_{servo_code.value}\n".encode()
             self.ser.write(command)
-            # print(f"Sent: {command.decode().strip()}") # For debugging
         except serial.SerialException as e:
             print(f"Error sending serial command: {e}")

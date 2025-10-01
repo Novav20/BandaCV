@@ -5,13 +5,12 @@
 
 class Motor {
 public:
-    Motor(int pwmPin, int dirPin);
+    Motor(int pwmPin);
     void setup();
-    void setSpeed(int pwmValue);
+    void setSpeed(int speed);
 
 private:
-    int _pwmPin;
-    int _dirPin;
+    int pwmPin;
 };
 
 #endif

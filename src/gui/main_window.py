@@ -172,7 +172,7 @@ class MainWindow(QMainWindow):
         self.ax.set_ylim(0, 430)
         self.ax.set_xlabel('time (s)')
         self.ax.set_ylabel('velocity (rpm)')
-        self.ax.set_title('REAL-TIME RPM READING', color='white', fontname='Arial', fontweight='bold', fontsize=12, fontstyle='italic')
+        self.ax.set_title('REAL-TIME RPM READING', color='white', fontname='DejaVu Sans', fontweight='bold', fontsize=12, fontstyle='italic')
         self.line, = self.ax.plot([], [], linewidth=2, linestyle='solid', color='white')
         self.figure.set_facecolor('#1A2835')
         self.figure.tight_layout()
