@@ -1,7 +1,9 @@
 import sys
 import cv2
 import numpy as np
-from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QSlider, QCheckBox, QLineEdit
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
+                             QHBoxLayout, QLabel, QPushButton, QSlider,
+                             QCheckBox, QLineEdit, QDialog, QDialogButtonBox)
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 
@@ -10,6 +12,45 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 
 from src.core.application_controller import ApplicationController
 from src.config.config import AppConfig
+from src.vision.classifiers import ServoCode
+
+
+class ServoDebugDialog(QDialog):
+    """
+    A dialog window for manually sending servo commands for debugging.
+    """
+    def __init__(self, controller: ApplicationController, parent=None):
+        super().__init__(parent)
+        self.controller = controller
+        self.setWindowTitle("Servo Debugging")
+        self.layout = QVBoxLayout(self)
+
+        # Create buttons for each position
+        btn_triangle = QPushButton("Triangle / Red / Small (Pos: 30°)")
+        btn_triangle.clicked.connect(lambda: self.send_command(ServoCode.TRIANGLE))
+        self.layout.addWidget(btn_triangle)
+
+        btn_square = QPushButton("Square / Yellow / Medium (Pos: 90°)")
+        btn_square.clicked.connect(lambda: self.send_command(ServoCode.SQUARE))
+        self.layout.addWidget(btn_square)
+
+        btn_circle = QPushButton("Circle / Green / Large (Pos: 150°)")
+        btn_circle.clicked.connect(lambda: self.send_command(ServoCode.CIRCLE))
+        self.layout.addWidget(btn_circle)
+
+        btn_unknown = QPushButton("Unknown / Home (Pos: 0°)")
+        btn_unknown.clicked.connect(lambda: self.send_command(ServoCode.UNKNOWN))
+        self.layout.addWidget(btn_unknown)
+
+        # Add a close button
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        button_box.rejected.connect(self.reject)
+        self.layout.addWidget(button_box)
+
+    def send_command(self, servo_code: ServoCode):
+        """Sends the selected servo command via the controller."""
+        self.controller.send_debug_servo_command(servo_code)
+
 
 class MainWindow(QMainWindow):
     """The main window of the BandaCV application.
@@ -28,6 +69,7 @@ class MainWindow(QMainWindow):
     led_update_signal = pyqtSignal(int)
     calibration_update_signal = pyqtSignal(float)
     status_message_signal = pyqtSignal(str)
+    pwm_update_signal = pyqtSignal(int)
 
     def __init__(self, controller: ApplicationController):
         super().__init__()
@@ -46,7 +88,8 @@ class MainWindow(QMainWindow):
             self.graph_update_signal.emit,
             self.led_update_signal.emit,
             self.calibration_update_signal.emit,
-            self.status_message_signal.emit
+            self.status_message_signal.emit,
+            self.pwm_update_signal.emit
         )
 
         # Timer for processing video frames
@@ -142,6 +185,14 @@ class MainWindow(QMainWindow):
 
         left_column_layout.addLayout(button_layout)
 
+        # Debug Buttons
+        debug_layout = QHBoxLayout()
+        servo_debug_button = QPushButton("Servo Debug")
+        servo_debug_button.clicked.connect(self.open_servo_debug_dialog)
+        debug_layout.addWidget(servo_debug_button)
+        left_column_layout.addLayout(debug_layout)
+
+
         # Status Message
         self.status_bar = self.statusBar()
         self.status_bar.showMessage("Application Ready")
@@ -169,7 +220,7 @@ class MainWindow(QMainWindow):
         self.ax.spines['left'].set_color('white')
         self.ax.spines['right'].set_color('white')
 
-        self.ax.set_ylim(0, 430)
+        self.ax.set_ylim(0, AppConfig.GRAPH_RPM_MAX_LIMIT)
         self.ax.set_xlabel('time (s)')
         self.ax.set_ylabel('velocity (rpm)')
         self.ax.set_title('REAL-TIME RPM READING', color='white', fontname='DejaVu Sans', fontweight='bold', fontsize=12, fontstyle='italic')
@@ -184,6 +235,29 @@ class MainWindow(QMainWindow):
         self.led_update_signal.connect(self.update_led)
         self.calibration_update_signal.connect(self.update_calibration_label)
         self.status_message_signal.connect(self.status_bar.showMessage)
+        self.pwm_update_signal.connect(self.update_pwm_widgets)
+
+    def open_servo_debug_dialog(self):
+        """Opens the servo debugging dialog."""
+        dialog = ServoDebugDialog(self.controller, self)
+        dialog.exec()
+
+    def update_pwm_widgets(self, value: int):
+        """Updates the PWM slider and text box to a given value.
+
+        This method is called programmatically from the controller, so it blocks
+        signals to prevent creating a feedback loop.
+        """
+        # Block signals to prevent a feedback loop
+        self.pwm_slider.blockSignals(True)
+        self.pwm_text.blockSignals(True)
+
+        self.pwm_slider.setValue(value)
+        self.pwm_text.setText(str(value))
+
+        # Unblock signals so user interaction works again
+        self.pwm_slider.blockSignals(False)
+        self.pwm_text.blockSignals(False)
 
     def update_webcam_feed(self, frame: np.ndarray):
         """Updates the webcam feed label with a new frame.
@@ -272,7 +346,12 @@ class MainWindow(QMainWindow):
             if classifier_key != "size":
                 self.size_checkbox.setChecked(False)
             
-            self.controller.set_active_classifier(classifier_key)
+            if not self.controller.set_active_classifier(classifier_key):
+                # If setting the classifier fails (e.g., size not calibrated),
+                # uncheck the box to reflect the inactive state.
+                if classifier_key == "size":
+                    self.size_checkbox.setChecked(False)
+
         else:
             # If unchecked, ensure no classifier is active if all are unchecked
             if not self.color_checkbox.isChecked() and \

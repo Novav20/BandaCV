@@ -33,3 +33,26 @@ Este documento detalla las conexiones eléctricas entre el Arduino Uno, el drive
 | Motor Pololu 37D  | Azul (VCC)        | Arduino Uno        | 5V                   | Alimentación para el encoder       |
 | Motor Pololu 37D  | Verde (GND)       | Arduino Uno        | GND                  | Tierra para el encoder             |
 | Motor Pololu 37D  | Blanco (Canal B)  | -                  | -                    | No se utiliza en esta configuración|
+
+### 5. Conexión del Servomotor de Clasificación
+
+El servomotor se utiliza para desviar los objetos clasificados a diferentes contenedores.
+
+| Componente Origen | Pin/Terminal Origen | Componente Destino | Pin/Terminal Destino | Propósito                          |
+|-------------------|---------------------|--------------------|----------------------|------------------------------------|
+| Servomotor        | Cable de Señal (Naranja/Amarillo) | Arduino Uno        | Pin 10 (PWM `~`)     | Control de posición del servo      |
+| Servomotor        | Cable de VCC (Rojo) | Arduino Uno        | 5V                   | Alimentación para el servo         |
+| Servomotor        | Cable de GND (Marrón/Negro) | Arduino Uno        | GND                  | Tierra para el servo               |
+
+#### Códigos de Posición del Servo
+
+El firmware del Arduino responde a códigos numéricos enviados desde la aplicación de Python para mover el servo a posiciones predefinidas. Estas posiciones corresponden a las diferentes categorías de clasificación.
+
+| Código | Posición (Ángulo) | Categoría (Forma) | Categoría (Color) | Categoría (Tamaño) |
+|--------|-------------------|-------------------|-------------------|--------------------|
+| `0`    | 30°               | Triángulo         | Rojo              | Pequeño            |
+| `1`    | 90°               | Cuadrado          | Amarillo          | Mediano            |
+| `2`    | 150°              | Círculo           | Verde             | Grande             |
+| `9`    | 0°                | Desconocido       | Desconocido       | Desconocido        |
+
+**Nota:** El código `9` (Desconocido) es manejado por el caso `default` en el firmware y corresponde a la posición de reposo o inicial. Los valores de los ángulos son aproximados y deben ser calibrados físicamente para un rendimiento óptimo.

@@ -16,12 +16,15 @@ private:
     String _inputString;
     unsigned long _lastSerialSendTime;
     const unsigned long SERIAL_SEND_INTERVAL_MS = 100;
+    const unsigned long HEARTBEAT_TIMEOUT_MS = 2000; // 2 seconds
+    unsigned long _lastHeartbeatTime;
     Motor* _motor;
     ClassifierServo* _servo;
 
     void handleSerial();
     void processCommand(String command);
     void sendDataToPC(float rpm, int obstacleState);
+    void _checkHeartbeat();
 };
 
 #endif

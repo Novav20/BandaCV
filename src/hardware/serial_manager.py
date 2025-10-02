@@ -13,10 +13,11 @@ class SerialManager:
     Args:
         baudrate (int): The baud rate for the serial communication.
     """
-    def __init__(self, baudrate=AppConfig.BAUDRATE):
+    def __init__(self, baudrate=AppConfig.BAUDRATE, on_disconnect=None):
         self.baudrate = baudrate
         self.ser = None
         self.connected = False
+        self.on_disconnect = on_disconnect
 
     def _find_serial_device_port(self) -> str | None:
         """Finds a suitable serial port based on configured identifiers.
@@ -32,34 +33,32 @@ class SerialManager:
         return None
 
     def connect(self) -> bool:
-        """Connects to the serial device.
+        """Attempts to connect to the serial device once.
 
         This method searches for the serial device and establishes a connection.
-        It will keep retrying until a device is found.
+        It is non-blocking and will return success or failure after one attempt.
 
         Returns:
             bool: True if the connection is successful, False otherwise.
         """
-        if self.connected and self.ser.is_open:
-            print("Already connected to serial device.")
+        if self.connected and self.ser and self.ser.is_open:
             return True
 
-        port = None
-        while port is None:
-            print("Searching for serial device...")
-            port = self._find_serial_device_port()
-            if port is None:
-                print("Device not found. Retrying in 1 second...")
-                time.sleep(1)
+        port = self._find_serial_device_port()
+        if port is None:
+            return False
 
         try:
-            self.ser = serial.Serial(port, self.baudrate, timeout=1) # Set a timeout
-            time.sleep(2) # Allow device to reset
+            self.ser = serial.Serial(port, self.baudrate, timeout=1)
+            # The short sleep is critical for some Arduino boards to initialize
+            # after a serial connection is made.
+            time.sleep(2)
             self.connected = True
             print(f"Successfully connected to serial device on port {port}")
             return True
         except serial.SerialException as e:
             print(f"Error connecting to serial device: {e}")
+            self.ser = None
             self.connected = False
             return False
 
@@ -80,11 +79,11 @@ class SerialManager:
                                      obstacle sensor state, or None if an error
                                      occurs.
         """
-        if not self.connected or not self.ser.is_open:
+        if not self.connected or not self.ser or not self.ser.is_open:
             return None
         try:
             line = self.ser.readline().decode('utf-8', errors='ignore').strip()
-            if not line: # Handle empty line if timeout occurs
+            if not line:  # Handle empty line if timeout occurs
                 return None
             data_list = line.split('_')
             if len(data_list) == 2:
@@ -93,6 +92,9 @@ class SerialManager:
                 return rpm_value, obstacle_sensor_state_value
         except (serial.SerialException, ValueError) as e:
             print(f"Error reading serial data: {e}")
+            self.connected = False
+            if self.on_disconnect:
+                self.on_disconnect()
         return None
 
     def send_command(self, pwm_value: int, servo_code: ServoCode):
@@ -104,7 +106,7 @@ class SerialManager:
             pwm_value (int): The PWM value for the motor.
             servo_code (ServoCode): The code for the servo position.
         """
-        if not self.connected or not self.ser.is_open:
+        if not self.connected or not self.ser or not self.ser.is_open:
             # Silently return if not connected, to avoid flooding the console
             return
         try:
@@ -112,3 +114,6 @@ class SerialManager:
             self.ser.write(command)
         except serial.SerialException as e:
             print(f"Error sending serial command: {e}")
+            self.connected = False
+            if self.on_disconnect:
+                self.on_disconnect()

@@ -23,7 +23,7 @@ class ApplicationController:
     def __init__(self, config: AppConfig):
         self.config = config
         self.camera = Camera(config.WEBCAM_INDEX, config.CAMERA_RESOLUTION)
-        self.serial_manager = SerialManager(config.BAUDRATE)
+        self.serial_manager = SerialManager(config.BAUDRATE, on_disconnect=self.handle_serial_disconnection)
         self.image_processor = ImageProcessor(config)
 
         self.classifiers = {
@@ -37,15 +37,17 @@ class ApplicationController:
         self.data_deque = deque(maxlen=self.config.MAX_SAMPLES)
         self.stop_event = Event()
         self.serial_read_thread = None
+        self.heartbeat_thread = None
 
         self.pwm_value = 0
         self.current_servo_code = ServoCode.UNKNOWN
         self.pixels_per_cm = None
         self.calibrated = False
 
-        self.obstacle_detected = False
+        self.is_classification_active = False
+        self.previous_ir_state = 0
         self.detection_start_time = None
-        self.servo_codes_buffer = Counter() # To store servo codes during detection window
+        self.servo_codes_buffer = Counter()  # To store servo codes during detection window
 
         # Callbacks for UI updates (to be set by the GUI)
         self.on_frame_update = None
@@ -53,8 +55,9 @@ class ApplicationController:
         self.on_led_update = None
         self.on_calibration_update = None
         self.on_status_message = None
+        self.on_pwm_update = None
 
-    def register_ui_callbacks(self, on_frame_update, on_graph_update, on_led_update, on_calibration_update, on_status_message):
+    def register_ui_callbacks(self, on_frame_update, on_graph_update, on_led_update, on_calibration_update, on_status_message, on_pwm_update):
         """Registers UI callback functions for updating the GUI.
 
         This allows the controller to be decoupled from the GUI implementation.
@@ -65,23 +68,41 @@ class ApplicationController:
             on_led_update (callable): Callback for updating the obstacle LED.
             on_calibration_update (callable): Callback for updating calibration status.
             on_status_message (callable): Callback for displaying status messages.
+            on_pwm_update (callable): Callback for updating PWM widgets.
         """
         self.on_frame_update = on_frame_update
         self.on_graph_update = on_graph_update
         self.on_led_update = on_led_update
         self.on_calibration_update = on_calibration_update
         self.on_status_message = on_status_message
+        self.on_pwm_update = on_pwm_update
+
+    def handle_serial_disconnection(self):
+        """Handles the event of a serial disconnection."""
+        if self.on_status_message:
+            self.on_status_message("Serial device disconnected. Attempting to reconnect...")
+        # Best-effort attempt to send a safe-state command. This will likely fail.
+        self.serial_manager.send_command(0, ServoCode.UNKNOWN)
 
     def _read_serial_data_loop(self):
-        """Continuously reads data from the serial port in a separate thread.
-
-        This method runs in a background thread to avoid blocking the main
-        application. It reads RPM and obstacle sensor data from the Arduino,
-        updates the data deque, and triggers UI callbacks for the graph and LED.
-        """
-        self.serial_manager.connect()
+        """Continuously reads data from the serial port and handles reconnection."""
         start_time_read = time.time()
         while not self.stop_event.is_set():
+            if not self.serial_manager.connected:
+                # Attempt to reconnect
+                if self.serial_manager.connect():
+                    if self.on_status_message:
+                        self.on_status_message("Serial device reconnected.")
+                    # On successful reconnect, reset state to safe values
+                    self.pwm_value = 0
+                    self.current_servo_code = ServoCode.UNKNOWN
+                    if self.on_pwm_update:
+                        self.on_pwm_update(self.pwm_value)
+                else:
+                    # Wait before retrying to avoid spamming connection attempts
+                    time.sleep(1)
+                    continue  # Skip the rest of the loop and retry connection
+
             data = self.serial_manager.read_data()
             if data is not None:
                 rpm_value, obstacle_sensor_state_value = data
@@ -95,30 +116,34 @@ class ApplicationController:
                     self.on_graph_update(time_values, rpm_values)
                 if self.on_led_update:
                     self.on_led_update(obstacle_sensor_state_value)
-            time.sleep(0.01) # Small delay to prevent busy-waiting
+            else:
+                # A small sleep even if no data, to prevent busy-waiting
+                time.sleep(0.05)
 
     def start(self):
-        """Initializes and starts the application's components.
-
-        This method initializes the camera, starts the serial data reading
-        thread, and sends a status message to the UI.
-        """
+        """Initializes and starts the application's components."""
         self.camera.initialize()
         self.serial_read_thread = Thread(target=self._read_serial_data_loop)
         self.serial_read_thread.start()
+        self.heartbeat_thread = Thread(target=self._send_heartbeat_loop)
+        self.heartbeat_thread.start()
         if self.on_status_message:
             self.on_status_message("Application started. Waiting for serial connection...")
 
     def stop(self):
-        """Stops the application, cleans up resources, and joins threads.
-
-        This method sets the stop event to terminate background threads,
-        joins the serial reading thread, disconnects the serial port, and
-        releases the camera.
-        """
+        """Stops the application, cleans up resources, and joins threads."""
         self.stop_event.set()
+
+        # Stop the motor before closing the connection
+        print("Sending stop command to motor...")
+        self.serial_manager.send_command(0, ServoCode.UNKNOWN)
+        time.sleep(0.1)  # Give a moment for the command to be sent
+
+        if self.heartbeat_thread and self.heartbeat_thread.is_alive():
+            self.heartbeat_thread.join()
         if self.serial_read_thread and self.serial_read_thread.is_alive():
-            self.serial_read_thread.join() # Wait for thread to finish
+            self.serial_read_thread.join()  # Wait for thread to finish
+        
         self.serial_manager.disconnect()
         self.camera.release()
         if self.on_status_message:
@@ -188,51 +213,90 @@ class ApplicationController:
                 self.on_status_message("Calibration failed. Ensure a circular object is in view.")
 
     def process_video_frame(self):
-        """Processes a single video frame.
+        """Processes a single video frame using a rising-edge trigger state machine."""
+        if self.stop_event.is_set():
+            return
 
-        This is the main processing loop for the application. It reads a frame
-        from the camera, checks for obstacle detection, and if an obstacle is
-        present, it uses the active classifier to process the frame and determine
-        the object's classification. It also handles the logic for sending
-        commands to the Arduino based on the classification results.
-        """
         frame = self.camera.read_frame()
-        if frame is None: # Handle case where camera might not be ready or disconnected
+        if frame is None:
             return
 
         processed_frame = frame.copy()
-        current_servo_code_for_frame = ServoCode.UNKNOWN
 
-        # Check for obstacle detection state from serial data
-        obstacle_sensor_state_value = 0
+        # 1. Get current IR sensor state
+        current_ir_state = 0
         if self.data_deque:
-            _, _, obstacle_sensor_state_value = self.data_deque[-1]
+            _, _, current_ir_state = self.data_deque[-1]
 
-        if obstacle_sensor_state_value == 1:
-            if not self.obstacle_detected:
-                self.obstacle_detected = True
-                self.detection_start_time = time.time()
-                self.servo_codes_buffer.clear()
-
+        # 2. State Machine Logic
+        # State: IDLE (classification is not active)
+        if not self.is_classification_active:
+            # Check for a rising edge on the IR sensor
+            if current_ir_state == 1 and self.previous_ir_state == 0:
+                if not self.active_classifier:
+                    if self.on_status_message:
+                        self.on_status_message("Obstacle detected. Select a classifier to begin.")
+                else:
+                    # Rising edge detected and classifier is active, start classification
+                    self.is_classification_active = True
+                    self.detection_start_time = time.time()
+                    self.servo_codes_buffer.clear()
+                    if self.on_status_message:
+                        self.on_status_message("IR Triggered! Classifying...")
+        
+        # State: CLASSIFYING (classification is active)
+        else:
+            # Classification is active, so process the frame regardless of IR state
             if self.active_classifier:
-                current_servo_code_for_frame, processed_frame = self.image_processor.process_frame(frame, self.active_classifier)
-                self.servo_codes_buffer[current_servo_code_for_frame] += 1
+                _, processed_frame = self.image_processor.process_frame(frame, self.active_classifier)
+                self.servo_codes_buffer[_.value] += 1 # Use the enum value for the counter key
 
+            # Check if classification time has elapsed
             if time.time() - self.detection_start_time >= self.config.DETECTION_PROCESSING_TIME_SECONDS:
                 if self.servo_codes_buffer:
-                    most_common_servo_code = self.servo_codes_buffer.most_common(1)[0][0]
-                    self.current_servo_code = most_common_servo_code
+                    # Determine most common classification
+                    most_common_code_value = self.servo_codes_buffer.most_common(1)[0][0]
+                    self.current_servo_code = ServoCode(most_common_code_value)
                     self.serial_manager.send_command(self.pwm_value, self.current_servo_code)
                     if self.on_status_message:
-                        self.on_status_message(f"Detected: {self.current_servo_code.name}")
-                self.obstacle_detected = False
+                        self.on_status_message(f"Classification complete: {self.current_servo_code.name}")
+                
+                # Return to IDLE state
+                self.is_classification_active = False
                 self.detection_start_time = None
                 self.servo_codes_buffer.clear()
-        else:
-            self.obstacle_detected = False
-            self.detection_start_time = None
-            self.servo_codes_buffer.clear()
 
+        # 3. Update previous IR state for next frame's rising-edge detection
+        self.previous_ir_state = current_ir_state
+
+        # 4. Update the UI with the (potentially processed) frame
         if self.on_frame_update:
             self.on_frame_update(processed_frame)
+
+    def send_debug_servo_command(self, servo_code: ServoCode):
+        """
+        Sends a direct command to the servo for debugging purposes.
+        This method now also updates the controller's current servo state.
+
+        Args:
+            servo_code (ServoCode): The servo code to send.
+        """
+        if self.on_status_message:
+            self.on_status_message(f"Sending debug servo command: {servo_code.name}")
+        
+        # Update the internal state to make it persistent
+        self.current_servo_code = servo_code
+        
+        # Use the current PWM value and the new servo code
+        self.serial_manager.send_command(self.pwm_value, self.current_servo_code)
+
+    def _send_heartbeat_loop(self):
+        """Periodically sends the current state to the Arduino as a heartbeat."""
+        while not self.stop_event.is_set():
+            if self.serial_manager.connected:
+                # Send the current PWM and servo code as a heartbeat
+                self.serial_manager.send_command(self.pwm_value, self.current_servo_code)
+            
+            # Wait for 1 second before sending the next heartbeat
+            time.sleep(1)
 
