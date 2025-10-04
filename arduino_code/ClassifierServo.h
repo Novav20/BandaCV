@@ -13,11 +13,6 @@ public:
 private:
     int _servoPin;
     Servo _servo;
-    // Servo positions - these should be calibrated
-    const int SERVO_POS_TRIANGLE = 30;
-    const int SERVO_POS_SQUARE = 90;
-    const int SERVO_POS_CIRCLE = 150;
-    const int SERVO_POS_UNKNOWN = 0;
 };
 
 #endif

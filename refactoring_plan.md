@@ -86,4 +86,4 @@ This document outlines a plan to refactor the `cvband.py` and `main.py` files to
 ## Future Tasks & Reminders (for next session)
 
 - [x] **Fix Application Shutdown Errors:** Implemented a guard in `process_video_frame` to prevent crashes.
-- [xx] **Ensure Motor Stops on Exit:** Implemented in two ways: a best-effort command from Python on shutdown, and a robust watchdog on the Arduino.
+- [x] **Ensure Motor Stops on Exit:** Implemented in two ways: a best-effort command from Python on shutdown, and a robust watchdog on the Arduino.

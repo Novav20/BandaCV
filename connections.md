@@ -56,3 +56,32 @@ El firmware del Arduino responde a códigos numéricos enviados desde la aplicac
 | `9`    | 0°                | Desconocido       | Desconocido       | Desconocido        |
 
 **Nota:** El código `9` (Desconocido) es manejado por el caso `default` en el firmware y corresponde a la posición de reposo o inicial. Los valores de los ángulos son aproximados y deben ser calibrados físicamente para un rendimiento óptimo.
+
+### 6. Conexión del Sensor IR de Obstáculos
+
+El sensor infrarrojo se utiliza para detectar la presencia de objetos en la banda transportadora y activar el proceso de clasificación por visión computacional.
+
+| Componente Origen | Pin/Terminal Origen | Componente Destino | Pin/Terminal Destino | Propósito                          |
+|-------------------|---------------------|--------------------|----------------------|------------------------------------|
+| Sensor IR         | VCC                 | Arduino Uno        | 5V                   | Alimentación del sensor            |
+| Sensor IR         | GND                 | Arduino Uno        | GND                  | Tierra del sensor                  |
+| Sensor IR         | OUT (Señal)         | Arduino Uno        | Pin 7                | Señal digital de detección         |
+
+#### Configuración del Sensor IR
+
+- **Pin configurado:** Pin 7 (Digital)
+- **Modo:** `INPUT_PULLUP` (utiliza la resistencia pull-up interna del Arduino)
+- **Lógica de detección:** 
+  - `LOW` (0V) = Objeto detectado (sensor activado)
+  - `HIGH` (5V) = No hay objeto (sensor inactivo)
+- **Trigger:** El sistema usa detección por "rising edge" - la clasificación se inicia cuando el sensor pasa de no detectar a detectar un objeto
+
+#### Funcionamiento
+
+1. El sensor IR emite continuamente un haz infrarrojo
+2. Cuando un objeto interrumpe el haz, la salida del sensor cambia a `LOW`
+3. El Arduino detecta este cambio y notifica a la aplicación Python
+4. La aplicación Python inicia el proceso de clasificación por visión computacional
+5. Una vez clasificado, el servo mueve el objeto al contenedor correspondiente
+
+**Nota Técnica:** El sensor utiliza lógica invertida (LOW = objeto presente) debido a la configuración típica de los sensores IR de obstáculos. La resistencia pull-up interna mantiene la señal en HIGH cuando no hay objetos presentes.

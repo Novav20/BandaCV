@@ -15,8 +15,6 @@ private:
     long _baudRate;
     String _inputString;
     unsigned long _lastSerialSendTime;
-    const unsigned long SERIAL_SEND_INTERVAL_MS = 100;
-    const unsigned long HEARTBEAT_TIMEOUT_MS = 2000; // 2 seconds
     unsigned long _lastHeartbeatTime;
     Motor* _motor;
     ClassifierServo* _servo;

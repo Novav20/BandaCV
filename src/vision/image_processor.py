@@ -33,7 +33,7 @@ class ImageProcessor:
         # blurred = cv2.GaussianBlur(gray, (5, 5), 0)
         return frame
 
-    def process_frame(self, frame: np.ndarray, classifier: BaseClassifier) -> tuple[ServoCode, np.ndarray]:
+    def process_frame(self, frame: np.ndarray, classifier: BaseClassifier) -> tuple[ServoCode, np.ndarray, str]:
         """Processes a frame using a given classifier.
 
         Args:
@@ -41,12 +41,13 @@ class ImageProcessor:
             classifier (BaseClassifier): The classifier to use for processing.
 
         Returns:
-            tuple[ServoCode, np.ndarray]: A tuple containing the servo code and the
-                                           processed frame with annotations.
+            tuple[ServoCode, np.ndarray, str]: A tuple containing the servo code,
+                                                the processed frame, and the friendly
+                                                name of the result.
         """
         if classifier is None:
-            return ServoCode.UNKNOWN, frame
+            return ServoCode.UNKNOWN, frame, "Unknown"
 
         preprocessed_frame = self.preprocess_frame(frame)
-        servo_code, annotated_frame = classifier.classify(preprocessed_frame)
-        return servo_code, annotated_frame
+        servo_code, annotated_frame, friendly_name = classifier.classify(preprocessed_frame)
+        return servo_code, annotated_frame, friendly_name

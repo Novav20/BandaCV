@@ -1,3 +1,4 @@
+#include "config.h"
 #include "ClassifierServo.h"
 
 ClassifierServo::ClassifierServo(int servoPin) {

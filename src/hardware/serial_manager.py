@@ -11,10 +11,11 @@ class SerialManager:
     reading data, and sending commands.
 
     Args:
-        baudrate (int): The baud rate for the serial communication.
+        config (AppConfig): The application configuration object.
+        on_disconnect (callable, optional): Callback for when disconnection occurs.
     """
-    def __init__(self, baudrate=AppConfig.BAUDRATE, on_disconnect=None):
-        self.baudrate = baudrate
+    def __init__(self, config: AppConfig, on_disconnect=None):
+        self.config = config
         self.ser = None
         self.connected = False
         self.on_disconnect = on_disconnect
@@ -27,7 +28,7 @@ class SerialManager:
         """
         ports = list(serial.tools.list_ports.comports())
         for port in ports:
-            for identifier in AppConfig.SERIAL_DEVICE_IDENTIFIERS:
+            for identifier in self.config.SERIAL_DEVICE_IDENTIFIERS:
                 if identifier in port.description or identifier in port.hwid or identifier in port.device:
                     return str(port.device)
         return None
@@ -49,10 +50,14 @@ class SerialManager:
             return False
 
         try:
-            self.ser = serial.Serial(port, self.baudrate, timeout=1)
+            self.ser = serial.Serial(
+                port,
+                self.config.BAUDRATE,
+                timeout=self.config.SERIAL_TIMEOUT_SECONDS
+            )
             # The short sleep is critical for some Arduino boards to initialize
             # after a serial connection is made.
-            time.sleep(2)
+            time.sleep(self.config.SERIAL_CONNECT_DELAY_SECONDS)
             self.connected = True
             print(f"Successfully connected to serial device on port {port}")
             return True

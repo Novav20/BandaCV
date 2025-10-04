@@ -1,3 +1,4 @@
+#include "config.h"
 #include "Communication.h"
 
 Communication::Communication(long baudRate, Motor* motor, ClassifierServo* servo) {
