@@ -3,9 +3,10 @@ import cv2
 import numpy as np
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QLabel, QPushButton, QSlider,
-                             QCheckBox, QLineEdit, QDialog, QDialogButtonBox)
-from PyQt6.QtGui import QImage, QPixmap
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+                             QCheckBox, QLineEdit, QDialog, QDialogButtonBox,
+                             QFrame, QMessageBox)
+from PyQt6.QtGui import QImage, QPixmap, QIcon
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QEasingCurve, QPropertyAnimation
 
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -14,6 +15,8 @@ from src.core.application_controller import ApplicationController
 from src.config.config import AppConfig
 from src.config.ui_config import UIConfig
 from src.vision.classifiers import ServoCode
+from PyQt6.QtWidgets import QDockWidget, QToolBar, QGraphicsDropShadowEffect
+from PyQt6.QtGui import QAction
 
 
 class ServoDebugDialog(QDialog):
@@ -60,6 +63,37 @@ class ServoDebugDialog(QDialog):
         self.controller.send_debug_servo_command(servo_code)
 
 
+class ServoDebugPanel(QWidget):
+    """A dockable panel with the same controls as ServoDebugDialog."""
+    def __init__(self, controller: ApplicationController, ui_config: UIConfig, parent=None):
+        super().__init__(parent)
+        self.controller = controller
+        self.ui_config = ui_config
+        self.layout = QVBoxLayout(self)
+        # Reuse the same buttons as dialog
+        btn_triangle = QPushButton(self.ui_config.SERVO_DEBUG_BTN_TRIANGLE)
+        btn_triangle.setStyleSheet(self.ui_config.STYLESHEET_PUSHBUTTON)
+        btn_triangle.clicked.connect(lambda: self.controller.send_debug_servo_command(ServoCode.TRIANGLE))
+        self.layout.addWidget(btn_triangle)
+
+        btn_square = QPushButton(self.ui_config.SERVO_DEBUG_BTN_SQUARE)
+        btn_square.setStyleSheet(self.ui_config.STYLESHEET_PUSHBUTTON)
+        btn_square.clicked.connect(lambda: self.controller.send_debug_servo_command(ServoCode.SQUARE))
+        self.layout.addWidget(btn_square)
+
+        btn_circle = QPushButton(self.ui_config.SERVO_DEBUG_BTN_CIRCLE)
+        btn_circle.setStyleSheet(self.ui_config.STYLESHEET_PUSHBUTTON)
+        btn_circle.clicked.connect(lambda: self.controller.send_debug_servo_command(ServoCode.CIRCLE))
+        self.layout.addWidget(btn_circle)
+
+        btn_unknown = QPushButton(self.ui_config.SERVO_DEBUG_BTN_UNKNOWN)
+        btn_unknown.setStyleSheet(self.ui_config.STYLESHEET_PUSHBUTTON)
+        btn_unknown.clicked.connect(lambda: self.controller.send_debug_servo_command(ServoCode.UNKNOWN))
+        self.layout.addWidget(btn_unknown)
+
+        self.layout.addStretch()
+
+
 class MainWindow(QMainWindow):
     """The main window of the BandaCV application."""
     frame_update_signal = pyqtSignal(np.ndarray)
@@ -81,6 +115,8 @@ class MainWindow(QMainWindow):
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
         self.main_layout = QHBoxLayout(self.central_widget)
+        self.main_layout.setContentsMargins(self.ui_config.PADDING, self.ui_config.PADDING, self.ui_config.PADDING, self.ui_config.PADDING)
+        self.main_layout.setSpacing(self.ui_config.PADDING)
 
         self.setup_ui()
         self.connect_signals()
@@ -98,22 +134,27 @@ class MainWindow(QMainWindow):
 
     def setup_ui(self):
         """Initializes and arranges all the UI widgets in the main window."""
-        left_column_layout = QVBoxLayout()
-        left_column_layout.setSpacing(15)
+        # Left column card
+        left_card = QFrame()
+        left_card.setStyleSheet(self.ui_config.STYLESHEET_CARD)
+        left_card.setFrameShape(QFrame.Shape.StyledPanel)
+        left_card_layout = QVBoxLayout(left_card)
+        left_card_layout.setContentsMargins(self.ui_config.PADDING, self.ui_config.PADDING, self.ui_config.PADDING, self.ui_config.PADDING)
+        left_card_layout.setSpacing(12)
 
         title_label = QLabel(self.ui_config.UI_TITLE_LABEL)
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title_label.setStyleSheet(self.ui_config.STYLESHEET_LABEL_TITLE)
-        left_column_layout.addWidget(title_label)
+        left_card_layout.addWidget(title_label)
 
         self.figure, self.ax = plt.subplots(figsize=self.ui_config.GRAPH_FIGSIZE)
         self.canvas = FigureCanvas(self.figure)
-        left_column_layout.addWidget(self.canvas)
+        left_card_layout.addWidget(self.canvas)
         self.setup_graph()
 
         pwm_label = QLabel("PWM")
         pwm_label.setStyleSheet(self.ui_config.STYLESHEET_LABEL_SUBTITLE)
-        left_column_layout.addWidget(pwm_label)
+        left_card_layout.addWidget(pwm_label)
 
         pwm_control_layout = QHBoxLayout()
         self.pwm_slider = QSlider(Qt.Orientation.Horizontal)
@@ -134,7 +175,7 @@ class MainWindow(QMainWindow):
         update_pwm_button.setStyleSheet(self.ui_config.STYLESHEET_PUSHBUTTON)
         update_pwm_button.clicked.connect(self.update_pwm_from_text)
         pwm_control_layout.addWidget(update_pwm_button)
-        left_column_layout.addLayout(pwm_control_layout)
+        left_card_layout.addLayout(pwm_control_layout)
 
         sensor_calib_layout = QHBoxLayout()
         obstacle_label = QLabel("Obstacle Sensor State:")
@@ -150,67 +191,130 @@ class MainWindow(QMainWindow):
         self.calibration_label = QLabel(f"px/cm: N/A")
         self.calibration_label.setStyleSheet(self.ui_config.STYLESHEET_LABEL_BODY)
         sensor_calib_layout.addWidget(self.calibration_label)
-        left_column_layout.addLayout(sensor_calib_layout)
+        left_card_layout.addLayout(sensor_calib_layout)
 
         classifier_label = QLabel("Classifier")
         classifier_label.setStyleSheet(self.ui_config.STYLESHEET_LABEL_SUBTITLE)
-        left_column_layout.addWidget(classifier_label)
+        left_card_layout.addWidget(classifier_label)
 
         self.color_checkbox = QCheckBox("Color")
         self.color_checkbox.setStyleSheet(self.ui_config.STYLESHEET_CHECKBOX)
         self.color_checkbox.toggled.connect(lambda checked: self.on_classifier_checkbox_toggled("color", checked))
-        left_column_layout.addWidget(self.color_checkbox)
+        left_card_layout.addWidget(self.color_checkbox)
 
         self.shape_checkbox = QCheckBox("Shape")
         self.shape_checkbox.setStyleSheet(self.ui_config.STYLESHEET_CHECKBOX)
         self.shape_checkbox.toggled.connect(lambda checked: self.on_classifier_checkbox_toggled("shape", checked))
-        left_column_layout.addWidget(self.shape_checkbox)
+        left_card_layout.addWidget(self.shape_checkbox)
 
         self.size_checkbox = QCheckBox("Size")
         self.size_checkbox.setStyleSheet(self.ui_config.STYLESHEET_CHECKBOX)
         self.size_checkbox.toggled.connect(lambda checked: self.on_classifier_checkbox_toggled("size", checked))
-        left_column_layout.addWidget(self.size_checkbox)
+        left_card_layout.addWidget(self.size_checkbox)
 
-        left_column_layout.addStretch()
+        left_card_layout.addStretch()
 
         button_layout = QHBoxLayout()
         calibrate_button = QPushButton("Calibrate Camera")
-        calibrate_button.setStyleSheet(self.ui_config.STYLESHEET_PUSHBUTTON)
+        calibrate_button.setStyleSheet(self.ui_config.STYLESHEET_PUSHBUTTON_PRIMARY)
+        # add icon if available and scale it
+        try:
+            icon_pix = QPixmap("assets/calibrate.svg").scaled(self.ui_config.UI_ICON_SIZE[0], self.ui_config.UI_ICON_SIZE[1], Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            calibrate_button.setIcon(QIcon(icon_pix))
+            calibrate_button.setIconSize(icon_pix.size())
+        except Exception:
+            pass
         calibrate_button.clicked.connect(self.controller.calibrate_camera)
         button_layout.addWidget(calibrate_button)
 
-        stop_button = QPushButton("Stop")
-        stop_button.setStyleSheet(self.ui_config.STYLESHEET_PUSHBUTTON)
-        stop_button.clicked.connect(self.close)
+        stop_button = QPushButton()
+        stop_button.setStyleSheet(self.ui_config.STYLESHEET_PUSHBUTTON_DANGER)
+        stop_button.setToolTip('Stop the application')
+        try:
+            stop_pix = QPixmap("assets/stop.svg").scaled(self.ui_config.UI_ICON_SIZE[0], self.ui_config.UI_ICON_SIZE[1], Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            stop_button.setIcon(QIcon(stop_pix))
+            stop_button.setIconSize(stop_pix.size())
+        except Exception:
+            stop_button.setText('Stop')
+        stop_button.clicked.connect(self.on_stop_clicked)
+        stop_button.setFixedWidth(self.ui_config.UI_ICON_SIZE[0] + 20)
         button_layout.addWidget(stop_button)
-        left_column_layout.addLayout(button_layout)
+        left_card_layout.addLayout(button_layout)
 
-        debug_layout = QHBoxLayout()
-        servo_debug_button = QPushButton("Servo Debug")
-        servo_debug_button.setStyleSheet(self.ui_config.STYLESHEET_PUSHBUTTON)
-        servo_debug_button.clicked.connect(self.open_servo_debug_dialog)
-        debug_layout.addWidget(servo_debug_button)
-        left_column_layout.addLayout(debug_layout)
+        # Toolbar and dock for servo debug panel
+        self.toolbar = QToolBar("Tools")
+        self.addToolBar(self.toolbar)
+
+        servo_action = QAction(QIcon("assets/servo.svg"), "Servo Debug", self)
+        servo_action.setCheckable(True)
+        self.toolbar.addAction(servo_action)
+
+        # Create dock widget
+        self.servo_dock = QDockWidget("Servo Debug", self)
+        self.servo_dock.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea)
+        self.servo_panel = ServoDebugPanel(self.controller, self.ui_config, self)
+        self.servo_dock.setWidget(self.servo_panel)
+        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.servo_dock)
+        self.servo_dock.hide()
+
+        def toggle_servo(checked):
+            if checked:
+                self.servo_dock.show()
+            else:
+                self.servo_dock.hide()
+        servo_action.toggled.connect(toggle_servo)
+
+        left_card_layout.addSpacing(6)
+
+        # Add smoothing control next to PWM controls
+        from PyQt6.QtWidgets import QSpinBox
+        smoothing_layout = QHBoxLayout()
+        smoothing_label = QLabel('Smoothing:')
+        smoothing_label.setStyleSheet(self.ui_config.STYLESHEET_LABEL_BODY)
+        smoothing_layout.addWidget(smoothing_label)
+        self.smoothing_spin = QSpinBox()
+        self.smoothing_spin.setRange(1, 20)
+        self.smoothing_spin.setValue(self.ui_config.GRAPH_SMOOTHING_WINDOW)
+        self.smoothing_spin.valueChanged.connect(self.on_smoothing_changed)
+        smoothing_layout.addWidget(self.smoothing_spin)
+        smoothing_layout.addStretch()
+        left_card_layout.addLayout(smoothing_layout)
 
         self.status_bar = self.statusBar()
         self.status_bar.setStyleSheet(f"color: {self.ui_config.COLOR_TEXT_SECONDARY};")
         self.status_bar.showMessage("Application Ready")
 
-        self.main_layout.addLayout(left_column_layout)
+        self.main_layout.addWidget(left_card)
 
-        right_column_layout = QVBoxLayout()
-        self.webcam_label = QLabel("Waiting for Webcam Feed...")
+        # Right column card (webcam)
+        right_card = QFrame()
+        right_card.setStyleSheet(self.ui_config.STYLESHEET_CARD)
+        right_card.setFrameShape(QFrame.Shape.StyledPanel)
+        right_card_layout = QVBoxLayout(right_card)
+        right_card_layout.setContentsMargins(self.ui_config.PADDING, self.ui_config.PADDING, self.ui_config.PADDING, self.ui_config.PADDING)
+        right_card_layout.setSpacing(0)
+
+        self.webcam_label = QLabel()
         self.webcam_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.webcam_label.setFixedSize(AppConfig.CAMERA_RESOLUTION[0], AppConfig.CAMERA_RESOLUTION[1])
-        self.webcam_label.setStyleSheet(self.ui_config.UI_WEBCAM_BORDER_STYLE)
-        right_column_layout.addWidget(self.webcam_label)
-        self.main_layout.addLayout(right_column_layout)
+        self.webcam_label.setStyleSheet(self.ui_config.UI_WEBCAM_BORDER_STYLE + " padding: 8px;")
+        # set placeholder pixmap
+        try:
+            placeholder = QPixmap("assets/webcam.svg")
+            scaled = placeholder.scaled(self.webcam_label.width()//1.8, self.webcam_label.height()//1.8, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            self.webcam_label.setPixmap(scaled)
+        except Exception:
+            self.webcam_label.setText("Waiting for Webcam Feed...")
+
+        right_card_layout.addWidget(self.webcam_label)
+        self.main_layout.addWidget(right_card)
+
 
     def setup_graph(self):
         """Configures the appearance of the Matplotlib graph for RPM data."""
         self.figure.set_facecolor(self.ui_config.GRAPH_FACE_COLOR)
         self.ax.set_facecolor(self.ui_config.GRAPH_FACE_COLOR)
-        self.ax.tick_params(colors=self.ui_config.GRAPH_TICK_COLOR, labelsize=8)
+        self.ax.tick_params(colors=self.ui_config.GRAPH_TICK_COLOR, labelsize=9)
         self.ax.xaxis.label.set_color(self.ui_config.GRAPH_TICK_COLOR)
         self.ax.yaxis.label.set_color(self.ui_config.GRAPH_TICK_COLOR)
         for spine in self.ax.spines.values():
@@ -220,6 +324,8 @@ class MainWindow(QMainWindow):
         self.ax.set_xlabel(self.ui_config.GRAPH_X_LABEL)
         self.ax.set_ylabel(self.ui_config.GRAPH_Y_LABEL)
         self.ax.set_title(self.ui_config.GRAPH_TITLE, **self.ui_config.GRAPH_TITLE_FONT)
+        # grid for readability
+        self.ax.grid(True, color=self.ui_config.GRAPH_GRID_COLOR, linestyle='--', linewidth=0.5, alpha=0.6)
         self.line, = self.ax.plot([], [], 
                                  linewidth=self.ui_config.GRAPH_LINE_WIDTH, 
                                  linestyle=self.ui_config.GRAPH_LINE_STYLE, 
@@ -270,10 +376,43 @@ class MainWindow(QMainWindow):
 
     def update_led(self, state: int):
         """Updates the obstacle sensor LED indicator."""
+        # create drop shadow effect once
+        if not hasattr(self, '_led_effect'):
+            effect = QGraphicsDropShadowEffect(self)
+            effect.setBlurRadius(0)
+            effect.setOffset(0, 0)
+            effect.setColor(Qt.GlobalColor.red)
+            self.led_label.setGraphicsEffect(effect)
+            self._led_effect = effect
+
         if state == 1:
             self.led_label.setStyleSheet(self.ui_config.UI_LED_ON_STYLE)
+            # animate glow (continuous)
+            anim = QPropertyAnimation(self._led_effect, b'blurRadius', self)
+            anim.setStartValue(2)
+            anim.setEndValue(18)
+            anim.setDuration(1000)
+            anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
+            anim.setLoopCount(-1)  # infinite
+            anim.start()
+            self._led_anim = anim
         else:
             self.led_label.setStyleSheet(self.ui_config.UI_LED_OFF_STYLE)
+            if hasattr(self, '_led_anim'):
+                try:
+                    self._led_anim.stop()
+                except Exception:
+                    pass
+                self._led_effect.setBlurRadius(0)
+
+    def on_smoothing_changed(self, value: int):
+        """Update smoothing window used by the graph (stored in UIConfig for simplicity)."""
+        try:
+            self.ui_config.GRAPH_SMOOTHING_WINDOW = int(value)
+            if self.status_bar:
+                self.status_bar.showMessage(f"Smoothing set to: {value}")
+        except Exception:
+            pass
 
     def update_calibration_label(self, pixels_per_cm: float):
         """Updates the calibration label with the new pixels-per-centimeter value."""
@@ -295,6 +434,15 @@ class MainWindow(QMainWindow):
                 self.status_bar.showMessage("PWM value must be between 0 and 255.")
         except ValueError:
             self.status_bar.showMessage("Invalid PWM value. Please enter a number.")
+
+    def on_stop_clicked(self):
+        """Ask confirmation before stopping the application."""
+        reply = QMessageBox.question(self, 'Confirm Stop', 'Are you sure you want to stop the application?',
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                     QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
+            self.controller.stop()
+            self.close()
 
     def on_classifier_checkbox_toggled(self, classifier_key: str, checked: bool):
         """Handles the toggling of classifier checkboxes."""

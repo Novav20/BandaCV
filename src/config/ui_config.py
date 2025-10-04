@@ -9,11 +9,12 @@ class UIConfig:
     UI_TITLE_LABEL = "BandaCV"
 
     # --- Color Palette ---
-    COLOR_BACKGROUND = '#1e1e1e'
-    COLOR_SURFACE = '#2d2d2d'
-    COLOR_PRIMARY = '#00a2e8'
-    COLOR_PRIMARY_HOVER = '#33b5eb'
-    COLOR_PRIMARY_PRESSED = '#0077a8'
+    # Slightly softened dark theme for less aggressive contrast
+    COLOR_BACKGROUND = '#222222'
+    COLOR_SURFACE = '#2f2f2f'
+    COLOR_PRIMARY = '#1ea8d6'
+    COLOR_PRIMARY_HOVER = '#32b7e6'
+    COLOR_PRIMARY_PRESSED = '#1284a6'
     COLOR_TEXT = '#e0e0e0'
     COLOR_TEXT_SECONDARY = '#a0a0a0'
     COLOR_DANGER = '#e53935'
@@ -67,6 +68,42 @@ class UIConfig:
             background-color: {COLOR_PRIMARY_PRESSED};
         }}
     """
+
+    # Primary / Danger variants for buttons
+    # Primary outline variant (less visually heavy so icons stand out)
+    STYLESHEET_PUSHBUTTON_PRIMARY = f"""
+        QPushButton {{
+            background-color: transparent;
+            color: {COLOR_PRIMARY};
+            border: 1px solid {COLOR_PRIMARY};
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+        }}
+        QPushButton:hover {{
+            background-color: rgba(30,168,214,0.08);
+        }}
+        QPushButton:pressed {{
+            background-color: rgba(30,168,214,0.12);
+        }}
+    """
+
+    STYLESHEET_PUSHBUTTON_DANGER = f"""
+        QPushButton {{
+            background-color: {COLOR_DANGER};
+            color: {COLOR_BACKGROUND};
+            border: 0px solid transparent;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+        }}
+        QPushButton:hover {{
+            background-color: #b23030;
+        }}
+        QPushButton:pressed {{
+            background-color: #8b2a2a;
+        }}
+    """
     
     STYLESHEET_CHECKBOX = f"""
         QCheckBox {{
@@ -75,14 +112,15 @@ class UIConfig:
             font-size: 12px;
         }}
         QCheckBox::indicator {{
-            width: 15px;
-            height: 15px;
+            width: 18px;
+            height: 18px;
             border: 1px solid {COLOR_BORDER};
-            border-radius: 3px;
+            border-radius: 4px;
             background-color: {COLOR_SURFACE};
         }}
         QCheckBox::indicator:checked {{
             background-color: {COLOR_PRIMARY};
+            border: 1px solid {COLOR_PRIMARY};
         }}
     """
 
@@ -112,13 +150,45 @@ class UIConfig:
         color: {COLOR_TEXT};
     """
 
+    # --- Card / Panel style ---
+    PADDING = 12
+    CARD_BG = COLOR_SURFACE
+    STYLESHEET_CARD = f"""
+        QFrame {{
+            background-color: {CARD_BG};
+            border: 1px solid {COLOR_BORDER};
+            border-radius: 8px;
+        }}
+    """
+
+    # Disabled state
+    STYLESHEET_DISABLED = f"""
+        QWidget:disabled {{
+            color: {COLOR_TEXT_SECONDARY};
+            background-color: {COLOR_SURFACE};
+            opacity: 0.7;
+        }}
+
+    """
+
     # --- Widget Specific Settings ---
     UI_PWM_INPUT_WIDTH = 50
     PWM_SLIDER_PAGE_STEP = 20
     UI_LED_SIZE = (32, 32)
-    UI_LED_ON_STYLE = f"background-color: {COLOR_DANGER}; border-radius: 16px;"
+    UI_LED_ON_STYLE = f"background-color: qradialgradient(cx:0.5, cy:0.5, radius:1, stop:0 {COLOR_DANGER}, stop:1 #7f0000); border: 1px solid {COLOR_DANGER}; border-radius: 16px;"
     UI_LED_OFF_STYLE = f"background-color: {COLOR_SURFACE}; border: 1px solid {COLOR_BORDER}; border-radius: 16px;"
-    UI_WEBCAM_BORDER_STYLE = f"border: 1px solid {COLOR_BORDER};"
+    UI_WEBCAM_BORDER_STYLE = f"border: 1px solid {COLOR_BORDER}; background-color: {COLOR_SURFACE}; color: {COLOR_TEXT_SECONDARY};"
+
+    # --- Icon and UI helper sizes ---
+    UI_ICON_SIZE = (32, 32)
+
+    # --- Graph visual tweaks ---
+    GRAPH_GRID_COLOR = '#333333'
+    GRAPH_TITLE_FONT = {
+        'color': COLOR_TEXT,
+        'fontweight': 'bold',
+        'fontsize': 13,
+    }
 
     # --- Graph Settings ---
     GRAPH_RPM_MAX_LIMIT = 300
